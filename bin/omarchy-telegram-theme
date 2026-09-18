@@ -94,6 +94,11 @@ def normalize_hex(value: object, key: str) -> str:
     return value.lower()
 
 
+def inferred_mode(background: str) -> str:
+    red, green, blue = rgb(background)
+    return "dark" if (red * 0.2126 + green * 0.7152 + blue * 0.0722) < 128 else "light"
+
+
 def read_omarchy_colors(path: Path) -> dict[str, str]:
     try:
         with path.open("rb") as stream:
@@ -104,6 +109,34 @@ def read_omarchy_colors(path: Path) -> dict[str, str]:
         raise ThemeError(f"invalid TOML in {path}: {error}") from error
 
     mode = document.get("mode")
+    if mode is None:
+        # Omarchy 4.0.x exports the terminal palette only. ANSI colors provide
+        # the same roles as the newer named palette.
+        legacy = {
+            "accent": "accent",
+            "selection": "selection_background",
+            "muted": "color8",
+            "background": "background",
+            "dark_background": "color0",
+            "darker_background": "color0",
+            "lighter_background": "color7",
+            "foreground": "foreground",
+            "dark_foreground": "color8",
+            "light_foreground": "color7",
+            "bright_foreground": "color15",
+            "red": "color1",
+            "yellow": "color3",
+            "green": "color2",
+            "cyan": "color6",
+            "blue": "color4",
+            "magenta": "color5",
+        }
+        colors = {
+            key: normalize_hex(document.get(source), source)
+            for key, source in legacy.items()
+        }
+        colors["mode"] = inferred_mode(colors["background"])
+        return colors
     if mode not in ("dark", "light"):
         raise ThemeError(f"mode must be 'dark' or 'light', got {mode!r}")
 

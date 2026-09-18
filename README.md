@@ -10,7 +10,7 @@ depend on a third-party Telegram client.
 
 ## Requirements
 
-- Omarchy 4.x
+- Omarchy 4.x (including the legacy terminal-only palette in 4.0.x)
 - Native Telegram Desktop (tested with Arch package `telegram-desktop` 7.0.9)
 - Python 3.11+
 

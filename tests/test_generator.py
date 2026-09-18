@@ -47,6 +47,24 @@ LIGHT = DARK.replace('mode = "dark"', 'mode = "light"').replace(
     'background = "#1a1b26"', 'background = "#eff1f5"'
 ).replace('foreground = "#a9b1d6"', 'foreground = "#4c4f69"')
 
+LEGACY = """\
+accent = "#5b5b5b"
+foreground = "#474747"
+background = "#CCCCCC"
+selection_foreground = "#CCCCCC"
+selection_background = "#333333"
+color0 = "#333333"
+color1 = "#3d3d3d"
+color2 = "#474747"
+color3 = "#515151"
+color4 = "#5b5b5b"
+color5 = "#656565"
+color6 = "#6f6f6f"
+color7 = "#cccccc"
+color8 = "#4a4a4a"
+color15 = "#ffffff"
+"""
+
 
 class GeneratorTest(unittest.TestCase):
     def generate(self, document: str):
@@ -76,6 +94,13 @@ class GeneratorTest(unittest.TestCase):
         self.assertIn("windowBg: #eff1f5;", output)
         self.assertIn("windowFg: #4c4f69;", output)
         self.assertIn("Omarchy theme: fixture (light)", output)
+
+    def test_omarchy_4_0_legacy_palette(self):
+        colors, output = self.generate(LEGACY)
+        self.assertEqual(colors["mode"], "light")
+        self.assertEqual(colors["selection"], "#333333")
+        self.assertEqual(colors["blue"], "#5b5b5b")
+        self.assertIn("windowBg: #cccccc;", output)
 
     def test_generated_palette_has_no_duplicate_keys(self):
         _, output = self.generate(DARK)
