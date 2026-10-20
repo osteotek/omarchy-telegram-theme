@@ -140,6 +140,23 @@ class GeneratorTest(unittest.TestCase):
         colors, _ = self.generate(LIGHT)
         self.assertEqual(generator.chat_wallpaper_color(colors), "#eff1f5")
 
+    def test_wallpaper_selection_uses_linearized_relative_luminance(self):
+        colors, _ = self.generate(DARK)
+        colors.update(
+            background="#00ff00",
+            dark_background="#cccccc",
+            darker_background="#ffffff",
+            lighter_background="#eeeeee",
+        )
+        self.assertEqual(generator.chat_wallpaper_color(colors), "#cccccc")
+
+        colors.update(
+            mode="light",
+            darker_background="#000000",
+            lighter_background="#111111",
+        )
+        self.assertEqual(generator.chat_wallpaper_color(colors), "#00ff00")
+
     def test_theme_package_is_deterministic(self):
         colors, palette = self.generate(DARK)
         wallpaper = generator.chat_wallpaper_color(colors)
