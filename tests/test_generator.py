@@ -104,7 +104,9 @@ class GeneratorTest(unittest.TestCase):
 
     def test_theme_package_contains_palette_and_chat_wallpaper(self):
         colors, palette = self.generate(DARK)
-        package = generator.build_theme_package(palette, colors["background"])
+        package = generator.build_theme_package(
+            palette, generator.chat_wallpaper_color(colors)
+        )
 
         with zipfile.ZipFile(io.BytesIO(package)) as archive:
             self.assertEqual(
@@ -127,13 +129,39 @@ class GeneratorTest(unittest.TestCase):
         self.assertEqual(struct.unpack(">II", chunks[b"IHDR"][:8]), (1, 1))
         self.assertEqual(
             zlib.decompress(chunks[b"IDAT"]),
-            b"\x00" + bytes((0x1A, 0x1B, 0x26)),
+            b"\x00" + bytes((0x0E, 0x0E, 0x14)),
         )
+
+    def test_dark_mode_wallpaper_uses_darkest_surface(self):
+        colors, _ = self.generate(DARK)
+        self.assertEqual(generator.chat_wallpaper_color(colors), "#0e0e14")
+
+    def test_light_mode_wallpaper_uses_lightest_surface(self):
+        colors, _ = self.generate(LIGHT)
+        self.assertEqual(generator.chat_wallpaper_color(colors), "#eff1f5")
+
+    def test_wallpaper_selection_uses_linearized_relative_luminance(self):
+        colors, _ = self.generate(DARK)
+        colors.update(
+            background="#00ff00",
+            dark_background="#cccccc",
+            darker_background="#ffffff",
+            lighter_background="#eeeeee",
+        )
+        self.assertEqual(generator.chat_wallpaper_color(colors), "#cccccc")
+
+        colors.update(
+            mode="light",
+            darker_background="#000000",
+            lighter_background="#111111",
+        )
+        self.assertEqual(generator.chat_wallpaper_color(colors), "#00ff00")
 
     def test_theme_package_is_deterministic(self):
         colors, palette = self.generate(DARK)
-        first = generator.build_theme_package(palette, colors["background"])
-        second = generator.build_theme_package(palette, colors["background"])
+        wallpaper = generator.chat_wallpaper_color(colors)
+        first = generator.build_theme_package(palette, wallpaper)
+        second = generator.build_theme_package(palette, wallpaper)
         self.assertEqual(first, second)
 
     def test_rejects_missing_color(self):
