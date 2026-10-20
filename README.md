@@ -65,9 +65,10 @@ The generator starts with Telegram Desktop's official custom-theme palette,
 recolors every literal (which prevents obscure dialogs from falling back to the
 blue/white day palette), and applies explicit mappings for primary surfaces,
 text, active states, chat bubbles, semantic colors, calls, and the filter
-sidebar. It also packages a `background.png` filled with Omarchy's `background`
-color, so applying the generated theme sets the chat wallpaper too. It supports
-both Omarchy `mode = "dark"` and `mode = "light"`.
+sidebar. It also packages a solid `background.png`: dark themes use their
+darkest surface color, while light themes use their lightest surface color.
+Applying the generated theme therefore sets a mode-appropriate chat wallpaper
+too. It supports both Omarchy `mode = "dark"` and `mode = "light"`.
 
 The outer file keeps the `.tdesktop-palette` extension because Telegram's
 hidden `loadcolors` picker only shows that suffix. Telegram detects the ZIP

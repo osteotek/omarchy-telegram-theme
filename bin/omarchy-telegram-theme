@@ -551,6 +551,26 @@ def png_solid_color(color: str) -> bytes:
     )
 
 
+def chat_wallpaper_color(colors: dict[str, str]) -> str:
+    """Choose a solid surface that follows the theme's light or dark mode."""
+    surfaces = tuple(
+        colors[key]
+        for key in (
+            "background",
+            "dark_background",
+            "darker_background",
+            "lighter_background",
+        )
+    )
+
+    def perceived_luminance(color: str) -> int:
+        red, green, blue = rgb(color)
+        return 299 * red + 587 * green + 114 * blue
+
+    select = max if colors["mode"] == "light" else min
+    return select(surfaces, key=perceived_luminance)
+
+
 def build_theme_package(palette: str, wallpaper_color: str) -> bytes:
     """Bundle the palette and wallpaper in Telegram's ZIP theme format."""
     output = io.BytesIO()
@@ -622,7 +642,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         base = read_base_palette(base_path)
         palette = render_palette(base, colors, args.theme)
-        package = build_theme_package(palette, colors["background"])
+        package = build_theme_package(palette, chat_wallpaper_color(colors))
         if args.check:
             print(
                 f"valid: {args.colors.expanduser()} -> "
