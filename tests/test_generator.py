@@ -136,12 +136,66 @@ class GeneratorTest(unittest.TestCase):
         second = generator.build_theme_package(palette, colors["background"])
         self.assertEqual(first, second)
 
-    def test_rejects_missing_color(self):
+    def test_rejects_missing_base_color(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "colors.toml"
+            path.write_text(DARK.replace('background = "#1a1b26"\n', ""))
+            with self.assertRaisesRegex(generator.ThemeError, "background"):
+                generator.read_omarchy_colors(path)
+
+    def test_missing_accent_falls_back_to_blue(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "colors.toml"
             path.write_text(DARK.replace('accent = "#7aa2f7"\n', ""))
-            with self.assertRaisesRegex(generator.ThemeError, "accent"):
-                generator.read_omarchy_colors(path)
+            colors = generator.read_omarchy_colors(path)
+            self.assertEqual(colors["accent"], colors["blue"])
+
+    def test_legacy_alacritty_style_colors_are_completed(self):
+        # What omarchy-theme-colors-from-alacritty and older third-party themes
+        # provide: no mode, no shades, ANSI slots instead of named colors.
+        legacy = """\
+accent = "#e2be8a"
+foreground = "#eadccc"
+background = "#0f0f0f"
+selection_background = "#e2be8a"
+color0 = "#0f0f0f"
+color1 = "#e25d6c"
+color2 = "#cea37f"
+color3 = "#f4bb54"
+color4 = "#e2be8a"
+color5 = "#d79ab0"
+color6 = "#9ac5c0"
+color7 = "#eadccc"
+color8 = "#5a5553"
+color15 = "#ffffff"
+"""
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "colors.toml"
+            path.write_text(legacy)
+            colors = generator.read_omarchy_colors(path)
+        self.assertEqual(colors["mode"], "dark")
+        self.assertEqual(colors["red"], "#e25d6c")
+        self.assertEqual(colors["cyan"], "#9ac5c0")
+        self.assertEqual(colors["selection"], "#e2be8a")
+        self.assertEqual(colors["muted"], "#5a5553")
+        self.assertEqual(colors["bright_foreground"], "#ffffff")
+        for key in generator.REQUIRED_COLORS:
+            self.assertRegex(colors[key], r"^#[0-9a-f]{6}$")
+        # Shades keep their ordering: darker < dark < background < lighter.
+        lum = generator.relative_luminance
+        self.assertLess(lum(colors["darker_background"]), lum(colors["dark_background"]))
+        self.assertLess(lum(colors["dark_background"]), lum(colors["background"]))
+        self.assertLess(lum(colors["background"]), lum(colors["lighter_background"]))
+
+    def test_light_legacy_theme_detects_mode(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "colors.toml"
+            path.write_text('background = "#eff1f5"\nforeground = "#4c4f69"\naccent = "#1e66f5"\n'
+                            'color1 = "#d20f39"\ncolor2 = "#40a02b"\ncolor3 = "#df8e1d"\n'
+                            'color4 = "#1e66f5"\ncolor5 = "#ea76cb"\ncolor6 = "#179299"\n')
+            colors = generator.read_omarchy_colors(path)
+        self.assertEqual(colors["mode"], "light")
+        self.assertEqual(colors["bright_foreground"], colors["foreground"])
 
     def test_atomic_writer_is_idempotent(self):
         with tempfile.TemporaryDirectory() as temporary:

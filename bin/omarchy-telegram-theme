@@ -103,6 +103,12 @@ def read_omarchy_colors(path: Path) -> dict[str, str]:
     except tomllib.TOMLDecodeError as error:
         raise ThemeError(f"invalid TOML in {path}: {error}") from error
 
+    # Third-party themes that predate the full colors.toml schema carry only
+    # the Alacritty-derived keys (accent, selection, background, foreground,
+    # color0-15). Omarchy itself stages those unchanged, so derive the shades
+    # the palette needs instead of failing the theme switch.
+    document = complete_legacy_colors(document)
+
     mode = document.get("mode")
     if mode not in ("dark", "light"):
         raise ThemeError(f"mode must be 'dark' or 'light', got {mode!r}")
@@ -110,6 +116,83 @@ def read_omarchy_colors(path: Path) -> dict[str, str]:
     colors = {"mode": mode}
     for key in REQUIRED_COLORS:
         colors[key] = normalize_hex(document.get(key), key)
+    return colors
+
+
+def relative_luminance(value: str) -> float:
+    channels = []
+    for channel in rgb(value):
+        normalized = channel / 255.0
+        channels.append(
+            normalized / 12.92
+            if normalized <= 0.04045
+            else ((normalized + 0.055) / 1.055) ** 2.4
+        )
+    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
+
+
+def complete_legacy_colors(document: dict) -> dict:
+    """Fill the extended keys from a legacy (Alacritty-style) colors.toml.
+
+    Shade ratios follow Omarchy's bundled themes: dark themes step the
+    background 25% and 45% toward black and 9% toward the foreground; light
+    themes step 5% and 10% toward black and 10% toward the foreground.
+    """
+    if all(key in document for key in REQUIRED_COLORS) and "mode" in document:
+        return document
+
+    def hexval(key: str) -> str | None:
+        value = document.get(key)
+        if isinstance(value, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", value):
+            return value.lower()
+        return None
+
+    background = hexval("background")
+    foreground = hexval("foreground")
+    if background is None or foreground is None:
+        return document
+
+    colors = dict(document)
+    mode = colors.get("mode")
+    if mode not in ("dark", "light"):
+        mode = "dark" if relative_luminance(background) < 0.5 else "light"
+        colors["mode"] = mode
+    dark = mode == "dark"
+
+    ansi = {
+        "red": "color1",
+        "green": "color2",
+        "yellow": "color3",
+        "blue": "color4",
+        "magenta": "color5",
+        "cyan": "color6",
+    }
+    for name, fallback in ansi.items():
+        if hexval(name) is None and hexval(fallback) is not None:
+            colors[name] = hexval(fallback)
+
+    if hexval("accent") is None and hexval("blue") is None and hexval("color4"):
+        colors["accent"] = hexval("color4")
+    if hexval("accent") is None and "blue" in colors:
+        colors["accent"] = colors["blue"]
+    if hexval("selection") is None:
+        colors["selection"] = hexval("selection_background") or mix(
+            background, foreground, 0.15
+        )
+    if hexval("muted") is None:
+        colors["muted"] = hexval("color8") or mix(foreground, background, 0.5)
+
+    shades = {
+        "dark_background": mix(background, "#000000", 0.25 if dark else 0.05),
+        "darker_background": mix(background, "#000000", 0.45 if dark else 0.10),
+        "lighter_background": mix(background, foreground, 0.09 if dark else 0.10),
+        "dark_foreground": mix(foreground, background, 0.5),
+        "light_foreground": mix(foreground, background, 0.12),
+        "bright_foreground": (hexval("color15") if dark else None) or foreground,
+    }
+    for key, value in shades.items():
+        if hexval(key) is None:
+            colors[key] = value
     return colors
 
 
